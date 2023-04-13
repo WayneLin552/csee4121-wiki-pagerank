@@ -1,3 +1,0 @@
-Question 1
-The default block size on HDFS is 128 MB.
-The default replication factor on Dataproc is 2.
