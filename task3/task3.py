@@ -1,101 +1,162 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+# In[1]:
+
+
+import os
+os.environ['PYSPARK_SUBMIT_ARGS'] = '--packages com.databricks:spark-xml_2.12:0.14.0 pyspark-shell'
+
+
+# In[2]:
+
+
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[1]:
+from pyspark.sql import SparkSession
+import re
+import xml.etree.ElementTree as ET
+from pyspark.sql.functions import udf, explode, col, when, lower
+from pyspark.sql.types import ArrayType, StringType
+from operator import add
+spark = SparkSession.builder.getOrCreate()
+df = spark.read.format('xml').options(rowTag='page').load('hdfs:/wiki-whole.xml')
+#df.printSchema()
+
+
+# In[3]:
+
+
+
+# In[4]:
+
+
+import re
+#write the udf and regrex function
+def extract_text(text):
+    try:
+        match = re.findall(r'\[\[[^\[\]]+\]\]',text)
+    except:
+        match = []
+    output = []
+    for link in match:
+        temp = link.split('|')[0].lower()
+        if (':' in temp) and ('Category:' not in temp):
+            continue
+        elif '#' in temp:
+            continue
+        else: output.append(temp)
+    return [re.sub(r'\[|\]','',a) for a in output]
+
+
+# In[5]:
+
+
+# In[3]:
+
+udf_extract_text = udf(lambda x:extract_text(x), ArrayType(StringType()))
+#select columns that we need
+df2 = df.select(col('title'), col('revision.text._VALUE').alias('links'))
+#explode the links column
+df2 = df2.withColumn('internal_links',explode(udf_extract_text(df2['links'])))
+#lower all the rows
+df2 = df2.select(lower(col('title')).alias('title'),col('internal_links').alias('internal_links'))
+#drop na rows
+df2 = df2.select(col('title'),col('internal_links')).na.drop()
+#sort rows in ascending order
+df2  = df2.select(col('title'),col('internal_links')).sort(['title','internal_links'],ascending=True)
+
+
+# In[6]:
+
+
+
+
+# In[7]:
+
+
+
+
+# In[8]:
+
+
+articles = df2.select(col('title')).distinct().union(df2.select(col('internal_links')).distinct())
+
+
 # In[9]:
 
-
-from pyspark.sql import SparkSession
-import pandas as pd
-from collections import Counter
 
 
 # In[10]:
 
 
-spark = SparkSession.builder.getOrCreate()
-df = spark.read.csv('gs://programming-hw2-1-bucket/notebooks/jupyter/task2/part-00000-4c276f20-f2fd-4803-8321-6ce555355788-c000.csv',
-                   inferSchema=True,header=False,sep='\t')
+ranks = articles.rdd.map(lambda url_neighbors: (url_neighbors[0], 1.0))
 
 
-# In[30]:
+# In[11]:
 
 
-#df.show()
+iterations = 10
+
+
+# In[12]:
+
+
+df2_rdd = df2.rdd.groupByKey().cache()
+
+
+# In[13]:
+
+
+
+
+# In[14]:
+
+
+
+# In[15]:
+
+
 
 
 # In[16]:
 
 
-def get_article_counter(input_file):
-    '''
-    get articles and their related titles, then get counter of neighbors
-    '''
-    articles={}
-    counter = []
-    for item in input_file.collect():
-        left, right = item
-        counter.append(left)
-        articles[right] = articles.get(right,[])+[left]
-        articles[left] = articles.get(left,[])
-    counter = Counter(counter)
-    return articles, counter
-
-def init_rank(articles):
-    '''
-    initial ranks
-    '''
-    ranks = {}
-    for article in articles:
-        ranks[article] = 1
-    return ranks
-
-def cal_contributions(articles,counter,ranks):
-    '''
-    calculate the contributions of each article
-    '''
-    contributions = {}
-    for article in articles:
-        contributions[article]=0
-        neighbor = articles[article]
-        for i in neighbor:
-            contributions[article] +=ranks[i]/counter[i]
-    return contributions
-
-def update_rank(ranks, contributions):
-    '''
-    update ranks base on contributions
-    '''
-    for article in ranks:
-        ranks[article] = 0.15+0.85*contributions[article]
-    return ranks
-        
+def computeContribs(urls, rank):
+    num_urls = len(urls)
+    for url in urls:
+        yield (url, rank / num_urls)
 
 
-# In[28]:
+# In[17]:
 
 
-if __name__=='__main__':
-    articles, counter = get_article_counter(df)
-    ranks = init_rank(articles)
-    for i in range(10):
-        contributions = cal_contributions(articles,counter,ranks)
-        ranks = update_rank(ranks,contributions)
-    result = pd.DataFrame(ranks.items(),columns=['title','rank'])
-    result = result.sort_values(by=['rank','title'],ascending=True)
-    result.head(10).to_csv('gs://programming-hw2-1-bucket/notebooks/jupyter/task3.csv',header=False,sep='\t',index=False,encoding='utf-8')
-        
+from operator import add
+for iteration in range(iterations):
+    contribution = df2_rdd.join(ranks).flatMap(lambda x: computeContribs(
+            x[1][0], x[1][1]  # type: ignore[arg-type]
+        ))
+    # (article0, (neighbours, rank)) -> (article, contribution)
+    ranks = contribution.reduceByKey(add).mapValues(lambda rank: rank * 0.85 + 0.15)
 
 
-# In[29]:
+# In[ ]:
 
 
-#result.sort_values(by=['rank','title'],ascending=True).head()
+ranks_df= ranks.toDF().withColumnRenamed("_1","article").withColumnRenamed("_2","rank").sort(["rank"], ascending=False)
 
 
 # In[ ]:
 
 
 
+
+# In[ ]:
+
+
+ranks_df.limit(10).toPandas().to_csv('work/task3.csv',header = False, index = False, sep='\t')
 
 
 # In[ ]:

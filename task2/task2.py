@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ET
 from pyspark.sql.functions import udf, explode, col, when, lower
 from pyspark.sql.types import ArrayType, StringType
 spark = SparkSession.builder.getOrCreate()
-df = spark.read.format('xml').options(rowTag='page').load('hdfs:/wiki-test.xml')
+df = spark.read.format('xml').options(rowTag='page').load('hdfs:/wiki-small.xml')
 #df.printSchema()
 
 

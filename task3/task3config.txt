@@ -1,38 +1,12 @@
-Task 3 configurations:
-	
-Region				us-central1
-Zone					us-central1-b
-Autoscaling				Off
-Dataproc Metastore		None
-Scheduled deletion		Off
-Master node				Standard (1 master, N workers)
-Machine type			n1-standard-4
-Number of GPUs			0
-Primary disk type			pd-standard
-Primary disk size			500GB
-Local SSDs				0
-Worker nodes			2
-Machine type			n1-standard-4
-Number of GPUs			0
-Primary disk type			pd-standard
-Primary disk size			500GB
-Local SSDs				0
-Secondary worker nodes		0
-Secure Boot				Disabled
-VTPM					Disabled
-Integrity Monitoring		Disabled
-Cloud Storage staging bucket	programming-hw2-1-bucket
-Network				default
-Network tags			None
-Internal IP only			No
-Image version 			2.0.61-debian10
-Created				Apr 12, 2023, 1:13:16 PM
-Optional components		JUPYTER			
-Advanced security			Disabled
-Encryption type			Google-managed key
+Task 3 Configurations
 
-Properties
-spark.executor.cores		4
-spark.driver.cores		4
-spark.executor.memory		5g
-spark.driver.memory		5g
+Question 8:
+Input: wiki-whole.xml
+Cluster: 3-Node cluster (2 Workers), HDSF block-size = Default (124MB), Replicate Factor = 1
+Job configuration: 
+    spark.executor.cores:  4
+    spark.driver.cores:  4
+    spark.executor.memory:  5g
+    spark.driver.memory:  5g
+
+ 
